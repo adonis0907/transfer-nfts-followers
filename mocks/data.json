@@ -1,0 +1,15 @@
+{
+    "accounts": [{
+        "name": "Devnet Wallet1",
+        "pubkey": "99Qqq2j6qp94shcduJXGQbG6Z4Eg63cwu3K4W5csmAMd",
+        "followers": ["3NSiiYWbEZb34YCxiwcF5eyFAHVJ7apBCokmZieaPsWm", "J4ekbS9r8J3eevARDCbJL71naTiu5NXbUvgARt3h3izT"]
+    }, {
+        "name": "Devnet Wallet2",
+        "pubkey": "3NSiiYWbEZb34YCxiwcF5eyFAHVJ7apBCokmZieaPsWm",
+        "followers": ["J4ekbS9r8J3eevARDCbJL71naTiu5NXbUvgARt3h3izT"]
+    }, {
+        "name": "Devnet Wallet3",
+        "pubkey": "J4ekbS9r8J3eevARDCbJL71naTiu5NXbUvgARt3h3izT",
+        "followers": []
+    }]
+}

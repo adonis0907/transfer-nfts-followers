@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import styled from "styled-components";
 import Countdown from "react-countdown";
-import { Button, CircularProgress, Snackbar } from "@material-ui/core";
+import { Button, CircularProgress, Snackbar, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Stack,
+         TextField, Input } from "@mui/material";
 import Alert from "@material-ui/lab/Alert";
 
 import * as anchor from "@project-serum/anchor";
@@ -21,6 +22,7 @@ import {
 
 import Skeleton from './logo.svg';
 import { randomBytes } from "crypto";
+import { SentimentSatisfiedAltRounded } from "@material-ui/icons";
 
 const ConnectButton = styled(WalletDialogButton)``;
 
@@ -65,6 +67,8 @@ const myItems = [
 ];
 
 const Home = (props: HomeProps) => {
+  const [ mintModalOpen, setMintModalOpen ] = useState(false);
+  const [ transferModalOpen, setTransferModalOpen ] = useState(false);
   const [curPage, setCurPage] = useState(0);
   const [curItems, setCurItems] = useState<NFTItem[]>(items);
   const [balance, setBalance] = useState<number>();
@@ -75,6 +79,9 @@ const Home = (props: HomeProps) => {
   const [itemsAvailable, setItemsAvailable] = useState(0);
   const [itemsRedeemed, setItemsRedeemed] = useState(0);
   const [itemsRemaining, setItemsRemaining] = useState(0);
+  const [nft, setNFT] = useState(null);
+  const [nftName, setNFTName] = useState('');
+  const [nftDesc, setNFTDesc] = useState('');
 
   const [alertState, setAlertState] = useState<AlertState>({
     open: false,
@@ -86,6 +93,12 @@ const Home = (props: HomeProps) => {
 
   const wallet = useAnchorWallet();
   const [candyMachine, setCandyMachine] = useState<CandyMachine>();
+
+  const handleModal = (name: string, state: boolean) => () => {
+    if (name == "mint")
+      setMintModalOpen(state);
+    else setTransferModalOpen(state);
+  }
 
   const refreshCandyMachineState = () => {
     (async () => {
@@ -180,6 +193,73 @@ const Home = (props: HomeProps) => {
     }
   };
 
+  const mintNFT = async () => {
+    try {
+      setIsMinting(true);
+      if (wallet && candyMachine?.program) {
+        const mintTxId = await mintOneToken(
+          candyMachine,
+          props.config,
+          wallet.publicKey,
+          props.treasury
+        );
+
+        const status = await awaitTransactionSignatureConfirmation(
+          mintTxId,
+          props.txTimeout,
+          props.connection,
+          "singleGossip",
+          false
+        );
+
+        if (!status?.err) {
+          setAlertState({
+            open: true,
+            message: "Congratulations! Mint succeeded!",
+            severity: "success",
+          });
+        } else {
+          setAlertState({
+            open: true,
+            message: "Mint failed! Please try again!",
+            severity: "error",
+          });
+        }
+      }
+    } catch (error: any) {
+      // TODO: blech:
+      let message = error.msg || "Minting failed! Please try again!";
+      if (!error.msg) {
+        if (error.message.indexOf("0x138")) {
+        } else if (error.message.indexOf("0x137")) {
+          message = `SOLD OUT!`;
+        } else if (error.message.indexOf("0x135")) {
+          message = `Insufficient funds to mint. Please fund your wallet.`;
+        }
+      } else {
+        if (error.code === 311) {
+          message = `SOLD OUT!`;
+          setIsSoldOut(true);
+        } else if (error.code === 312) {
+          message = `Minting period hasn't started yet.`;
+        }
+      }
+
+      setAlertState({
+        open: true,
+        message,
+        severity: "error",
+      });
+    } finally {
+      if (wallet) {
+        const balance = await props.connection.getBalance(wallet.publicKey);
+        setBalance(balance / LAMPORTS_PER_SOL);
+      }
+      setIsMinting(false);
+      refreshCandyMachineState();
+    }
+  }
+
   useEffect(() => {
     (async () => {
       if (wallet) {
@@ -199,7 +279,7 @@ const Home = (props: HomeProps) => {
   ]);
 
   return (
-    <main style={{position: 'relative'}}>
+    <main style={{position: 'relative', width: "100%"}} className="mx-auto">
       <div style={{
         width: '100%',
         display: 'flex',
@@ -212,24 +292,96 @@ const Home = (props: HomeProps) => {
           setCurPage(0);
           setCurItems(items);
         }}>Home</span>}
-        {wallet && <span style={{width: 80, cursor: 'pointer', margin: 20}} onClick={() => {
-          setCurPage(1);
-          setCurItems(myItems);
-        }}>My heroes</span>}
       </div>
       {wallet && (
-        <div style={{width: '100%', display: 'flex', flexDirection: 'row', justifyContent: 'space-between'}}>
-          <div>
-            <p>Total Available: {itemsAvailable}</p>
-            <p>Redeemed: {itemsRedeemed}</p>
-            <p>Remaining: {itemsRemaining}</p>
+        <Stack spacing={2}>
+          <div style={{width: '100%', display: 'flex', flexDirection: 'row', justifyContent: 'space-between'}}>
+            <div>
+              <p>Total Available: {itemsAvailable}</p>
+              <p>Redeemed: {itemsRedeemed}</p>
+              <p>Remaining: {itemsRemaining}</p>
+            </div>
+            <div>
+              <p>Wallet {shortenAddress(wallet.publicKey.toBase58() || "")}</p>
+              <p>Balance: {(balance || 0).toLocaleString()} SOL</p>
+              <div>
+                <Button variant="outlined" color="success" onClick={ handleModal("mint", true) } sx={{ m: 2 }}>
+                  Mint New NFT
+                </Button>
+                <Button variant="outlined" color="error" onClick={ handleModal("transfer", true) }>
+                  Transfer
+                </Button>
+              </div>
+            </div>
           </div>
-          <div>
-            <p>Wallet {shortenAddress(wallet.publicKey.toBase58() || "")}</p>
-            <p>Balance: {(balance || 0).toLocaleString()} SOL</p>
-          </div>
-        </div>
+        </Stack>
       )}
+
+      <Dialog
+        open={ mintModalOpen }
+        onClose={ handleModal("mint", false) }
+      >
+        <DialogTitle>Mint NFT</DialogTitle>
+        <DialogContent>
+          <Input type="file"
+            margin="dense"
+            id="nft"
+            fullWidth
+            onChange={e => setNFT(e.target.value)}
+          />
+          <TextField
+            autoFocus
+            margin="dense"
+            id="name"
+            label="NFT Name"
+            type="text"
+            fullWidth
+            variant="standard"
+            onChange={e => setNFTName(e.target.value)}
+          />
+          <TextField
+            margin="dense"
+            id="description"
+            label="NFT Description"
+            type="text"
+            fullWidth
+            variant="standard"
+            multiline
+            rows={ 5 }
+            onChange={e => setNFTDesc(e.target.value)}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={ handleModal("mint", false) }>Cancel</Button>
+          <Button onClick={ mintNFT }>Mint</Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={ transferModalOpen }
+        onClose={ handleModal("transfer", false) }
+      >
+        <DialogTitle>Transfer NFT To Followers</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            To subscribe to this website, please enter your email address here. We
+            will send updates occasionally.
+          </DialogContentText>
+          <TextField
+            autoFocus
+            margin="dense"
+            id="name"
+            label="Email Address"
+            type="email"
+            fullWidth
+            variant="standard"
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={ handleModal("transfer", false) }>Cancel</Button>
+          <Button color="error" onClick={ handleModal("transfer", false) }>Transfer</Button>
+        </DialogActions>
+      </Dialog>
 
       <MintContainer>
         {!wallet ? (
@@ -250,7 +402,7 @@ const Home = (props: HomeProps) => {
                 justifyContent: 'flex-start',
                 width: 200,
                 margin: 30,
-              }}>
+              }} key={ idx }>
                 <div
                   style={{
                     position: 'relative',
@@ -289,7 +441,8 @@ const Home = (props: HomeProps) => {
           maxWidth: 1100
         }}
         >
-          {curItems.map((item, idx) => 
+          {
+          /*curItems.map((item, idx) => 
             <div style={{
               display: 'flex',
               flexDirection: 'column',
@@ -349,7 +502,8 @@ const Home = (props: HomeProps) => {
                 )}
               </MintButton>
             </div>
-          )}
+          )
+                */}
         </div>
         }
       </MintContainer>

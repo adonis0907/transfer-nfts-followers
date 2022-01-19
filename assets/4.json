@@ -1,0 +1,24 @@
+{
+  "name": "TEST",
+  "symbol": "SOL",
+  "description": "",
+  "image": "image.jpg",
+  "external_url": "https://gateway.pinata.cloud/ipfs/QmfNeEPDPkbY8dTH1hNdAcTxHVNNddVuADYurCePyagQ6s",
+  "attributes": [
+  ],
+  "properties": {
+    "files": [
+      {
+        "uri": "image.jpg",
+        "type": "image/jpeg"
+      }
+    ],
+    "category": "image",
+    "creators": [
+      {
+        "share": 100,
+        "address": "99Qqq2j6qp94shcduJXGQbG6Z4Eg63cwu3K4W5csmAMd"
+      }
+    ]
+  }
+}
